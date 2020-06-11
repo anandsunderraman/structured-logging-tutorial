@@ -1,0 +1,6 @@
+- type: log
+  paths:
+    - /Users/asunderr/study/structured-logging-tutorial/logs/shipping.log
+  fields:
+     application: "shipping"
+     project: "example"

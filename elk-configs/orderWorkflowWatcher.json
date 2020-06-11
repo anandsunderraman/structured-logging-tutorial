@@ -1,0 +1,88 @@
+{
+  "trigger": {
+    "schedule": {
+      "interval": "1h"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": [
+          "example*"
+        ],
+        "types": [],
+        "body": {
+          "size": 10,
+          "query": {
+            "bool": {
+              "should": [
+                {
+                  "bool": {
+                    "must": [
+                      {
+                        "query_string": {
+                          "query": "message: \"Created new order\""
+                        }
+                      },
+                      {
+                        "range": {
+                          "@timestamp": {
+                            "gte": "now-1h",
+                            "lt": "now"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "bool": {
+                    "must": [
+                      {
+                        "query_string": {
+                          "query": "message: \"Shipped order\""
+                        }
+                      },
+                      {
+                        "range": {
+                          "@timestamp": {
+                            "gte": "now-1h",
+                            "lt": "now"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+   "condition": {
+    "script": {
+      "source": "def searchResults = ctx.payload.hits.hits;def orderIdMap = [:]; def currentTime = ctx.trigger['triggered_time'];ctx.payload.currentTime = currentTime;for (int i = 0; i < searchResults.size(); i++) {    def search = searchResults[i]['_source'];    def message = search.message;    def orderId = null;    def orderTracker = null;    if ('Created new order' == message) {        orderId = search.order.orderId;        orderTracker = orderIdMap[orderId];        if (orderTracker == null) {            orderTracker = [:];        }        orderTracker['orderCreationTime'] =  search['@timestamp'];        def diff = (currentTime.getMillis() - Instant.parse(orderTracker.orderCreationTime).toEpochMilli()) / 1000 ;        orderTracker['timeElapsedInSec'] = diff;        orderIdMap[orderId] = orderTracker;    } else if ('Shipped order' == message) {        orderId = search.shipment.orderId;        orderTracker = orderIdMap[orderId];        if (orderTracker == null) {            orderTracker = [:];        }        orderTracker['shippingTime'] =  search['@timestamp'];        orderIdMap[orderId] = orderTracker;    }}ctx.payload.orderIdMap = orderIdMap;String anomalies = '';for (orderId in orderIdMap.keySet()) {    def orderTracker = orderIdMap[orderId];    def shippingSLA = 5;    if (orderTracker.orderCreationTime!= null && orderTracker.shippingTime == null && orderTracker.timeElapsedInSec > shippingSLA) {        def message = 'OrderId: ' +  orderId + ' Created At: ' + orderTracker['orderCreationTime'];        anomalies = anomalies + message + '\n';    }}ctx.payload.anomalies = anomalies;return ctx.payload.anomalies.length() > 0;",
+      "lang": "painless"
+    }
+  },
+  "actions": {
+    "send_trigger": {
+      "throttle_period_in_millis": 60000,
+      "webhook": {
+        "scheme": "https",
+        "host": "hooks.slack.com",
+        "port": 443,
+        "method": "post",
+        "path": "/services/TF9CEHWJG/B014YSNAX6X/j1zMedPxAoiCYirINfnadLaW",
+        "params": {},
+        "headers": {
+          "Content-type": "application/json"
+        },
+        "body": "{  \"channel\": \"test-alerts\",  \"username\": \"kibana\",  \"attachments\": [    {      \"color\": \"danger\",      \"title\": \"Orders Workflow Error\",      \"text\": \" *Reason:* The following orders have been taken but have not been shipped  ``` {{ ctx.payload.anomalies}} ``` \",      \"footer\": \"ORDERS WORKFLOW\"    }  ]}"
+      }
+    }
+  }
+}

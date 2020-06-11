@@ -1,0 +1,5 @@
+filebeat.config.inputs:
+  enabled: true
+  path: /Users/asunderr/softwares/filebeat-6.6.0-darwin-x86_64/configs/*.yml
+output.logstash:
+  hosts: ["localhost:5044"]

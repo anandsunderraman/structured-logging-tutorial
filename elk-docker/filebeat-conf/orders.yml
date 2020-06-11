@@ -1,0 +1,6 @@
+- type: log
+  paths:
+    - /Users/asunderr/study/structured-logging-tutorial/logs/orders.log
+  fields:
+     application: "orders"
+     project: "example"

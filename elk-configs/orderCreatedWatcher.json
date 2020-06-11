@@ -1,0 +1,68 @@
+// PUT /_xpack/watcher/watch/neworder
+{
+  "trigger": {
+    "schedule": {
+      "interval": "1h"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": [
+          "example-orders*"
+        ],
+        "types": [],
+        "body": {
+          "size": 10,
+          "query": {
+            "bool": {
+              "must": [
+                {
+                  "match_phrase": {
+                    "message": {
+                      "query": "Created new order"
+                    }
+                  }
+                }
+              ],
+              "filter": [
+                {
+                  "range": {
+                    "@timestamp": {
+                      "gte": "now-1h"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "condition": {
+    "compare": {
+      "ctx.payload.hits.total": {
+        "gt": 0
+      }
+    }
+  },
+  "actions": {
+    "send_trigger": {
+      "throttle_period_in_millis": 60000,
+      "webhook": {
+        "scheme": "https",
+        "host": "hooks.slack.com",
+        "port": 443,
+        "method": "post",
+        "path": "/services/TF9CEHWJG/B014YSNAX6X/j1zMedPxAoiCYirINfnadLaW",
+        "params": {},
+        "headers": {
+          "Content-type": "application/json"
+        },
+        "body": "{  \"channel\": \"test-alerts\",  \"username\": \"kibana\",  \"attachments\": [    {      \"fallback\": \"{{ctx.payload.hits.hits.0._source.message}}\",      \"color\": \"good\",      \"author_name\": \"{{ctx.watch_id}}\",      \"fields\": [        {          \"title\": \"Order Id\",          \"value\": \"{{ctx.payload.hits.hits.0._source.order.orderId}}\",          \"short\": false        },        {          \"title\": \"Order Name\",          \"value\": \"{{ctx.payload.hits.hits.0._source.order.orderName}}\",          \"short\": false        }      ]    }  ]}"
+      }
+    }
+  }
+}
